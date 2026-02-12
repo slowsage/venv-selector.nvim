@@ -111,7 +111,9 @@ end
 ---Retrieve and activate the cached venv for the current working directory
 ---@param done? fun(activated: boolean) Callback called when retrieval/activation finishes
 function M.retrieve(done)
+    local trace = require("venv-selector.trace")
     local function finish(activated)
+        trace.log("CACHED_VENV: finish activated=%s", tostring(activated))
         cache_retrieval_done = true
         if done then done(activated == true) end
     end
@@ -126,11 +128,20 @@ function M.retrieve(done)
         return finish(false)
     end
 
-    -- NEW: skip cached venvs for uv / PEP 723 buffers
+    -- For uv / PEP 723 buffers: wait for UV resolution before releasing gate
     local bufnr = vim.api.nvim_get_current_buf()
-    if vim.api.nvim_buf_is_valid(bufnr) and uv2.is_uv_buffer(bufnr) then
-        log.debug("Skipping cached venv retrieval: uv (PEP 723) buffer detected")
-        return finish(false)
+    local is_uv = vim.api.nvim_buf_is_valid(bufnr) and uv2.is_uv_buffer(bufnr)
+    trace.log("CACHED_VENV: bufnr=%d is_uv=%s", bufnr, tostring(is_uv))
+    if is_uv then
+        log.debug("UV (PEP 723) buffer detected, waiting for UV resolution")
+        -- Register callback to be notified when UV activation completes
+        uv2.on_activate_callback = function(ok, _python_path)
+            trace.log("CACHED_VENV: UV callback ok=%s", tostring(ok))
+            finish(ok)
+        end
+        -- Ensure UV flow is running (may already be started by BufEnter autocmd)
+        uv2.run_uv_flow_if_needed(bufnr)
+        return
     end
 
 

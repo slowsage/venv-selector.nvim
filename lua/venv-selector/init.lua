@@ -75,6 +75,12 @@ local function gate_lsp_start()
     if vim.g.venv_selector_gate_installed then return end
     vim.g.venv_selector_gate_installed = true
 
+    local trace = require("venv-selector.trace")
+    -- Use directory of current file to write trace.log next to app.py
+    local bufname = vim.api.nvim_buf_get_name(0)
+    local trace_dir = bufname ~= "" and vim.fn.fnamemodify(bufname, ":h") or vim.fn.getcwd()
+    trace.init(trace_dir .. "/trace.log")
+
     vim.g.venv_selector_activated = vim.g.venv_selector_activated or false
 
     local orig_start = vim.lsp.start
@@ -84,14 +90,28 @@ local function gate_lsp_start()
     local queued = {} ---@type { config:any, opts:any, bufnr:number }[]
 
     local function flush()
+        trace.log("FLUSH: %d configs queued", #queued)
         if #queued == 0 then return end
         local items = queued
         queued = {}
 
         vim.schedule(function()
+            local path_mod = require("venv-selector.path")
+            local python = path_mod.current_python_path
+            local venv_type = path_mod.current_type
+            trace.log("FLUSH: injecting python=%s type=%s", tostring(python), tostring(venv_type))
+
             for _, it in ipairs(items) do
                 if vim.api.nvim_buf_is_valid(it.bufnr) then
-                    orig_start(it.config, it.opts)
+                    -- Inject python settings if venv is active
+                    if python then
+                        require("venv-selector.hooks").inject_python_settings(it.config, python, venv_type)
+                    end
+                    trace.log("FLUSH: starting %s bufnr=%d settings.python=%s",
+                        it.config.name or "?", it.bufnr,
+                        vim.inspect(it.config.settings and it.config.settings.python or "nil"))
+                    local id = orig_start(it.config, it.opts)
+                    trace.log("FLUSH: orig_start returned %s", tostring(id))
                 end
             end
         end)
@@ -104,6 +124,7 @@ local function gate_lsp_start()
         activation_started = true
 
         local function done_fail_open()
+            trace.log("ACTIVATION: done_fail_open queued=%d", #queued)
             -- unblock even if activation fails or is skipped
             vim.g.venv_selector_activated = true
             activation_started = false
@@ -156,21 +177,39 @@ local function gate_lsp_start()
         ---@cast o +{bufnr: integer, buffer: integer}
         local bufnr = o.bufnr or o.buffer
 
+        local info = debug.getinfo(2, "Sl")
+        local caller = info and (info.short_src .. ":" .. info.currentline) or "?"
+        trace.log("GATE: name=%s bufnr=%s ft=%s activated=%s started=%s caller=%s",
+            config.name or "?", tostring(bufnr),
+            bufnr and vim.api.nvim_buf_is_valid(bufnr) and vim.bo[bufnr].filetype or "?",
+            tostring(vim.g.venv_selector_activated), tostring(activation_started),
+            caller)
+
         if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
-            return orig_start(config, opts)
+            trace.log("GATE: PASS (invalid bufnr)")
+            local id = orig_start(config, opts)
+            trace.log("GATE: orig_start returned %s", tostring(id))
+            return id
         end
 
         if vim.bo[bufnr].filetype ~= "python" then
-            return orig_start(config, opts)
+            trace.log("GATE: PASS (not python)")
+            local id = orig_start(config, opts)
+            trace.log("GATE: orig_start returned %s", tostring(id))
+            return id
         end
 
         if vim.g.venv_selector_activated ~= true then
+            trace.log("GATE: QUEUE %s (returning nil)", config.name or "?")
             queued[#queued + 1] = { config = config, opts = opts, bufnr = bufnr }
             start_activation_once()
             return nil
         end
 
-        return orig_start(config, opts)
+        trace.log("GATE: PASS (activated)")
+        local id = orig_start(config, opts)
+        trace.log("GATE: orig_start returned %s", tostring(id))
+        return id
     end)
 end
 

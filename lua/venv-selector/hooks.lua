@@ -91,6 +91,9 @@ end
 ---@param env_type string|nil The type of the virtual environment
 ---@return boolean success, string? error Whether any clients were found and restart was attempted
 local function restart_all_python_lsps(venv_python, env_type)
+    local trace = require("venv-selector.trace")
+    trace.log("HOOKS: restart_all_python_lsps python=%s type=%s", tostring(venv_python), tostring(env_type))
+
     local function contains(list, item)
         return list and vim.tbl_contains(list, item)
     end
@@ -119,9 +122,15 @@ local function restart_all_python_lsps(venv_python, env_type)
     end
 
     -- Collect python LSP clients grouped by name + buffers
+    local all_clients = vim.lsp.get_clients()
+    trace.log("HOOKS: vim.lsp.get_clients() returned %d clients", #all_clients)
     local by_name = {} ---@type table<string, {client:any, bufs:table<number,true>}>
-    for _, c in ipairs(vim.lsp.get_clients()) do
+    for _, c in ipairs(all_clients) do
+        local fts = c.config and c.config.filetypes or nil
+        local attached = vim.tbl_keys(c.attached_buffers or {})
+        trace.log("HOOKS: client id=%d name=%s fts=%s attached_bufs=%s", c.id, c.name, vim.inspect(fts), vim.inspect(attached))
         if is_python_lsp(c) then
+            trace.log("HOOKS: IS python LSP: %s", c.name)
             local entry = by_name[c.name]
             if not entry then
                 entry = { client = c, bufs = {} }
@@ -132,7 +141,10 @@ local function restart_all_python_lsps(venv_python, env_type)
             end
         end
     end
-    if next(by_name) == nil then return false, "no python LSP clients selected" end
+    if next(by_name) == nil then
+        trace.log("HOOKS: no python LSP clients selected")
+        return false, "no python LSP clients selected"
+    end
 
     -- Stop all instances for these names (0.11-safe; no deprecated stop_client signature)
     for name, _ in pairs(by_name) do
@@ -151,6 +163,10 @@ local function restart_all_python_lsps(venv_python, env_type)
             local cfg        = vim.deepcopy(old_cfg)
 
             local gen        = default_lsp_settings(name, venv_python, env_type)
+            trace.log("HOOKS: restarting %s old_python=%s new_python=%s",
+                name,
+                vim.inspect(old_cfg.settings and old_cfg.settings.python and old_cfg.settings.python.pythonPath),
+                vim.inspect(gen.settings and gen.settings.python and gen.settings.python.pythonPath))
             cfg.settings     = gen.settings
             cfg.cmd_env      = gen.cmd_env
 
@@ -186,6 +202,38 @@ end
 
 
 
+
+---Inject python settings into an LSP config before starting
+---Used by flush() to inject venv python into queued configs
+---@param config table The LSP config to modify (mutates in place)
+---@param python_path string The python executable path
+---@param env_type string|nil The type of the virtual environment
+function M.inject_python_settings(config, python_path, env_type)
+    if not python_path then return end
+    if not config.name then return end
+
+    local venv_dir = vim.fn.fnamemodify(python_path, ":h:h")
+    local venv_name = vim.fn.fnamemodify(venv_dir, ":t")
+    local venv_path = vim.fn.fnamemodify(venv_dir, ":h")
+
+    -- Inject python settings
+    config.settings = config.settings or {}
+    config.settings.python = config.settings.python or {}
+    config.settings.python.pythonPath = python_path
+    config.settings.python.venv = venv_name
+    config.settings.python.venvPath = venv_path
+
+    -- Inject cmd_env
+    if env_type == "anaconda" then
+        config.cmd_env = config.cmd_env or {}
+        config.cmd_env.CONDA_PREFIX = venv_dir
+    elseif env_type == "venv" or env_type == "uv" then
+        config.cmd_env = config.cmd_env or {}
+        config.cmd_env.VIRTUAL_ENV = venv_dir
+    end
+
+    log.debug("Injected python settings into " .. config.name .. ": " .. python_path)
+end
 
 ---Dynamic hook that processes currently running clients (called when venv is selected)
 ---@param venv_python string|nil The path to the python executable

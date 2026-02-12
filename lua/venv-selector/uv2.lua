@@ -1,5 +1,7 @@
 local M = {}
 
+-- Callback for when UV activation completes (used by cached_venv to wait)
+M.on_activate_callback = nil
 
 local path_mod = require("venv-selector.path")
 
@@ -127,8 +129,18 @@ local function run_uv_python_find_and_activate(bufnr, done)
             end
 
             -- Activate immediately for first-time resolution (or if it differs)
+            local trace = require("venv-selector.trace")
+            trace.log("UV2: python_find result=%s current=%s", python_path, tostring(path_mod.current_python_path))
             if path_mod.current_python_path ~= python_path then
+                trace.log("UV2: activating python_path=%s", python_path)
                 require("venv-selector.venv").activate(python_path, "uv", false)
+            end
+
+            -- Notify any waiting callbacks (e.g., cached_venv gate)
+            if M.on_activate_callback then
+                local cb = M.on_activate_callback
+                M.on_activate_callback = nil
+                cb(true, python_path)
             end
 
             if done then done(true, python_path) end
@@ -171,11 +183,17 @@ end
 ---Ensure the correct venv is activated for a uv buffer
 ---@param bufnr integer
 function M.ensure_uv_buffer_activated(bufnr)
+    local trace = require("venv-selector.trace")
+    trace.log("UV2: ensure_uv_buffer_activated bufnr=%d", bufnr)
     require("venv-selector.logger").debug("ensure_uv_buffer_activated")
     if not vim.api.nvim_buf_is_valid(bufnr) then return end
-    if not M.is_uv_buffer(bufnr) then return end
+    if not M.is_uv_buffer(bufnr) then
+        trace.log("UV2: not a uv buffer, skipping")
+        return
+    end
 
     local last_python = vim.b[bufnr].venv_selector_uv_last_python
+    trace.log("UV2: last_python=%s current=%s", tostring(last_python), tostring(path_mod.current_python_path))
     if last_python and last_python ~= "" then
         if path_mod.current_python_path ~= last_python then
             require("venv-selector.venv").activate(last_python, "uv", false)
