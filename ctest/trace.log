@@ -1,0 +1,49 @@
+=== TRACE START Thu 12 Feb 2026 12:52:10 PM EST ===
+[12:52:10] GATE: name=copilot bufnr=nil ft=? activated=false started=false caller=.../share/nvim/lazy/copilot.lua/lua/copilot/client/init.lua:159
+[12:52:10] GATE: PASS (invalid bufnr)
+[12:52:10] GATE: orig_start returned 1
+[12:52:10] UV2: ensure_uv_buffer_activated bufnr=1
+[12:52:10] UV2: last_python=nil current=nil
+[12:52:10] GATE: name=ruff bufnr=1 ft=python activated=false started=false caller=...share/nvim/lazy/nvim-lspconfig/lua/lspconfig/manager.lua:130
+[12:52:10] GATE: QUEUE ruff (returning nil)
+[12:52:10] CACHED_VENV: bufnr=1 is_uv=true
+[12:52:10] GATE: name=basedpyright bufnr=1 ft=python activated=false started=true caller=...share/nvim/lazy/nvim-lspconfig/lua/lspconfig/manager.lua:130
+[12:52:10] GATE: QUEUE basedpyright (returning nil)
+[12:52:10] GATE: name=ruff bufnr=1 ft=python activated=false started=true caller=...share/nvim/lazy/nvim-lspconfig/lua/lspconfig/manager.lua:130
+[12:52:10] GATE: QUEUE ruff (returning nil)
+[12:52:10] GATE: name=basedpyright bufnr=1 ft=python activated=false started=true caller=...share/nvim/lazy/nvim-lspconfig/lua/lspconfig/manager.lua:130
+[12:52:10] GATE: QUEUE basedpyright (returning nil)
+[12:52:10] UV2: python_find result=/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3 current=nil
+[12:52:10] UV2: activating python_path=/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3
+[12:52:10] HOOKS: restart_all_python_lsps python=/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3 type=uv
+[12:52:10] HOOKS: vim.lsp.get_clients() returned 0 clients
+[12:52:10] HOOKS: no python LSP clients selected
+[12:52:10] CACHED_VENV: UV callback ok=true
+[12:52:10] CACHED_VENV: finish activated=true
+[12:52:10] ACTIVATION: done_fail_open queued=4
+[12:52:10] FLUSH: 4 configs queued
+[12:52:10] FLUSH: injecting python=/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3 type=uv
+[12:52:10] FLUSH: starting ruff bufnr=1 settings.python={
+  pythonPath = "/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3",
+  venv = "app-2691540843c6d2fe",
+  venvPath = "/home/sridhar/.cache/uv/environments-v2"
+}
+[12:52:10] FLUSH: orig_start returned 2
+[12:52:10] FLUSH: starting basedpyright bufnr=1 settings.python={
+  pythonPath = "/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3",
+  venv = "app-2691540843c6d2fe",
+  venvPath = "/home/sridhar/.cache/uv/environments-v2"
+}
+[12:52:11] FLUSH: orig_start returned 3
+[12:52:11] FLUSH: starting ruff bufnr=1 settings.python={
+  pythonPath = "/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3",
+  venv = "app-2691540843c6d2fe",
+  venvPath = "/home/sridhar/.cache/uv/environments-v2"
+}
+[12:52:11] FLUSH: orig_start returned 4
+[12:52:11] FLUSH: starting basedpyright bufnr=1 settings.python={
+  pythonPath = "/home/sridhar/.cache/uv/environments-v2/app-2691540843c6d2fe/bin/python3",
+  venv = "app-2691540843c6d2fe",
+  venvPath = "/home/sridhar/.cache/uv/environments-v2"
+}
+[12:52:11] FLUSH: orig_start returned 5
