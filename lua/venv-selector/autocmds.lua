@@ -137,6 +137,44 @@ function M.create()
         end,
     })
 
+    -- ============================================================================
+    -- LspAttach: restart late-arriving python LSPs with correct UV venv
+    -- ============================================================================
+    -- Covers the case where a python LSP (e.g., basedpyright) initializes
+    -- AFTER the UV flow has already resolved the venv python path.
+    -- Uses hook restart (stop+start) instead of didChangeConfiguration
+    -- because basedpyright ignores the advisory notification.
+
+    vim.api.nvim_create_autocmd("LspAttach", {
+        group = uv_group,
+        callback = function(args)
+            local bufnr = args.buf
+            if not is_normal_python_buf(bufnr) then return end
+            if is_disabled(bufnr) then return end
+
+            local uv_python = vim.b[bufnr].venv_selector_uv_last_python
+            if not uv_python or uv_python == "" then return end
+
+            local client = vim.lsp.get_client_by_id(args.data.client_id)
+            if not client then return end
+
+            local hooks = require("venv-selector.hooks")
+            if not hooks.is_python_lsp(client) then return end
+
+            -- Skip clients already managed by the plugin (gate restart sets this flag)
+            if client.config._venv_selector then return end
+
+            local py = ((client.config.settings or {}).python or {}).pythonPath
+            if py == uv_python then return end
+
+            -- Late-arriving python LSP with wrong settings — restart just this client
+            local log = require("venv-selector.logger")
+            log.debug(("LspAttach: restarting %s (pythonPath mismatch)"):format(client.name))
+
+            hooks.restart_single_python_lsp(client, uv_python, "uv", bufnr)
+        end,
+    })
+
     vim.api.nvim_create_autocmd("BufWritePost", {
         group = uv_group,
         callback = function(args)

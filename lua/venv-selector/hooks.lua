@@ -349,31 +349,40 @@ local function restart_all_python_lsps(venv_python, env_type, bufnr)
         return true
     end
 
-    for gate_key, entry in pairs(by_key) do
-        local old_cfg = entry.client.config or {}
-
-        if old_cfg._venv_selector ~= true then
-            snapshot_original_cfg(gate_key, old_cfg)
-        end
-
-        local cfg = vim.deepcopy(old_cfg)
-        cfg._venv_selector = true
-
-        local gen = default_lsp_settings(entry.name, venv_python, env_type)
-        cfg.settings = gen.settings
-        cfg.cmd_env = gen.cmd_env
-
-        cfg.capabilities = old_cfg.capabilities
-        cfg.handlers = old_cfg.handlers
-        cfg.on_attach = old_cfg.on_attach
-        cfg.init_options = old_cfg.init_options
-
-        cfg._venv_selector = true
-
-        gate.request(gate_key, cfg, entry.bufs)
+    for _, entry in pairs(by_key) do
+        M.restart_single_python_lsp(entry.client, venv_python, env_type, bufnr)
     end
 
     return true
+end
+
+---Restart a single python LSP client with venv-aware settings.
+---Used by restart_all_python_lsps and the LspAttach handler for late arrivals.
+---@param client any
+---@param venv_python string
+---@param env_type venv-selector.VenvType
+---@param bufnr integer
+function M.restart_single_python_lsp(client, venv_python, env_type, bufnr)
+    local gk = gate_key_for_client(client, bufnr)
+    local old_cfg = client.config or {}
+
+    if old_cfg._venv_selector ~= true then
+        snapshot_original_cfg(gk, old_cfg)
+    end
+
+    local cfg = vim.deepcopy(old_cfg)
+    cfg._venv_selector = true
+
+    local gen = default_lsp_settings(client.name, venv_python, env_type)
+    cfg.settings = gen.settings
+    cfg.cmd_env = gen.cmd_env
+
+    cfg.capabilities = old_cfg.capabilities
+    cfg.handlers = old_cfg.handlers
+    cfg.on_attach = old_cfg.on_attach
+    cfg.init_options = old_cfg.init_options
+
+    gate.request(gk, cfg, attached_python_bufs(client))
 end
 
 ---@param venv_python string|nil
