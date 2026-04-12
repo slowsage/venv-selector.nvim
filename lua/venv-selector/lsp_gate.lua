@@ -314,6 +314,18 @@ function M.request(key, cfg, bufs)
 
   st.inflight[key] = true
 
+  -- Suppress the ServerCancelled retrigger loop for pull-diagnostic clients.
+  -- on_diagnostic (vim/lsp/diagnostic.lua) retriggers textDocument/diagnostic
+  -- unconditionally on ServerCancelled. Overriding the handler to a no-op on
+  -- the stopping client prevents any in-flight response from reaching that code.
+  -- The client is being discarded so the override has no lasting effect.
+  for _, c in ipairs(clients_for_key(key)) do
+    if type(c.supports_method) == "function" and c:supports_method("textDocument/diagnostic") then
+      c.handlers = c.handlers or {}
+      c.handlers["textDocument/diagnostic"] = function() end
+    end
+  end
+
   stop_all_by_key(key, false)
   schedule_poll(key, my_gen)
 end
