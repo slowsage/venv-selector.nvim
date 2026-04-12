@@ -314,7 +314,18 @@ function M.request(key, cfg, bufs)
 
   st.inflight[key] = true
 
-  stop_all_by_key(key, false)
+  -- Force-kill pull-diagnostic clients to prevent the ServerCancelled retrigger
+  -- cascade from re-populating cleared pull namespaces after LspDetach fires.
+  -- Uses supports_method (not server_capabilities) to catch dynamic registrations.
+  local force = false
+  for _, c in ipairs(clients_for_key(key)) do
+    if type(c.supports_method) == "function" and c:supports_method("textDocument/diagnostic") then
+      force = true
+      break
+    end
+  end
+
+  stop_all_by_key(key, force)
   schedule_poll(key, my_gen)
 end
 
